@@ -1,4 +1,4 @@
 [submodule "pyScoreParser"]
 	path = pyScoreParser
-	url = https://github.com/jdasam/pyScoreParser.git
-	branch = refactoring
+	url = https://github.com/luciaicull/pyScoreParser.git
+	branch = refactoring_yj
