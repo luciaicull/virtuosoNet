@@ -108,6 +108,11 @@ def main():
     # TODO: to single function
     # load dataset
 
+    data_path = '/home/yoojin/data/20200330/test_xml_midi_95/save/'
+    train_data = PerformDataset(data_path, split='train')    
+    valid_data = PerformDataset(data_path, split='valid')
+    test_data = PerformDataset(data_path, split='test')
+    '''
     with open(args.dataName, "rb") as f:
         u = cPickle.Unpickler(f)
         data_set = u.load()
@@ -118,7 +123,7 @@ def main():
     valid_data = data_set['valid']
     print(type(train_data))
     test_data = test_data_set
-
+    '''
     '''
     if args.loss == 'MSE':
         def criterion(pred, target, aligned_status=1):
