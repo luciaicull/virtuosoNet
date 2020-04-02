@@ -4,8 +4,8 @@ from . import model_constants as const
 from . import data_process as dp
 
 
-def save_checkpoint(state, is_best, filename='isgn', model_name='prime'):
-    save_name = model_name + '_' + filename + '_checkpoint.pth.tar'
+def save_checkpoint(state, is_best, filename='isgn', model_name='prime', folder='', epoch=''):
+    save_name = folder + epoch + '_' + model_name + '_' + filename + '_checkpoint.pth.tar'
     th.save(state, save_name)
     if is_best:
         best_name = model_name + '_' + filename + '_best.pth.tar'

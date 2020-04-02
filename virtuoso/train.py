@@ -45,7 +45,10 @@ def train(args,
     start_epoch = 0
     NUM_UPDATED = 0
 
-    if args.resumeTraining and not args.trainTrill:
+    if args.resumeTraining and not args.trainTrill:     
+        # [Default] 
+        #   args.resumeTraining : False
+        #   args.trainTrill: False
         # Load trained-model to resume the training process
         if os.path.isfile('prime_' + args.modelCode + args.resume):
             print("=> loading checkpoint '{}'".format(args.modelCode + args.resume))
@@ -112,6 +115,8 @@ def train(args,
                                                                                    steps=args.time_steps)
             remaining_samples.append(temp_training_sample)
         print(sum([len(x.slice_indexes) for x in remaining_samples if x.slice_indexes]))
+
+        del_count = 0
         while len(remaining_samples) > 0:
             new_index = random.randrange(0, len(remaining_samples))
             selected_sample = remaining_samples[new_index]
@@ -145,34 +150,47 @@ def train(args,
                 key_lists.append(key)
 
             for i in range(args.num_key_augmentation+1):
-                key = key_lists[i]
-                temp_train_x = dp.key_augmentation(train_x, key)
-                kld_weight = sigmoid((NUM_UPDATED - args.kld_sig) / (args.kld_sig/10)) * args.kld_max
+                try:
+                    key = key_lists[i]
+                    temp_train_x = dp.key_augmentation(train_x, key)
+                    kld_weight = sigmoid((NUM_UPDATED - args.kld_sig) / (args.kld_sig/10)) * args.kld_max
 
-                training_data = {'x': temp_train_x, 'y': train_y, 'graphs': graphs,
-                                 'note_locations': note_locations,
-                                 'align_matched': align_matched, 'pedal_status': pedal_status,
-                                 'slice_idx': slice_idx, 'kld_weight': kld_weight}
+                    training_data = {'x': temp_train_x, 'y': train_y, 'graphs': graphs,
+                                    'note_locations': note_locations,
+                                    'align_matched': align_matched, 'pedal_status': pedal_status,
+                                    'slice_idx': slice_idx, 'kld_weight': kld_weight}
 
-                tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
-                    utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
-                tempo_loss_total.append(tempo_loss.item())
-                vel_loss_total.append(vel_loss.item())
-                dev_loss_total.append(dev_loss.item())
-                articul_loss_total.append(articul_loss.item())
-                pedal_loss_total.append(pedal_loss.item())
-                trill_loss_total.append(trill_loss.item())
-                kld_total.append(kld.item())
-                NUM_UPDATED += 1
+                    tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
+                        utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
+                    tempo_loss_total.append(tempo_loss.item())
+                    vel_loss_total.append(vel_loss.item())
+                    dev_loss_total.append(dev_loss.item())
+                    articul_loss_total.append(articul_loss.item())
+                    pedal_loss_total.append(pedal_loss.item())
+                    trill_loss_total.append(trill_loss.item())
+                    kld_total.append(kld.item())
+                    NUM_UPDATED += 1
+
+                except:
+                    print(train_xy[selected_sample.index]['perform_path'])
             del selected_sample.slice_indexes[selected_idx]
             if len(selected_sample.slice_indexes) == 0:
                 # print('every slice in the sample is trained')
                 del remaining_samples[new_index]
+                del_count += 1
+                
+            if del_count % 50 == 0:
+                print('sample [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
+                      .format(del_count, len(train_xy), np.mean(tempo_loss_total), np.mean(vel_loss_total),
+                              np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
+                
             # print("Remaining samples: ", sum([len(x.slice_indexes) for x in remaining_samples if x.slice_indexes]))
+        print('===========================================================================')
         print('Epoch [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
               .format(epoch + 1, args.num_epochs, np.mean(tempo_loss_total), np.mean(vel_loss_total),
                       np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
-
+        print(
+            '===========================================================================')
 
         ## Validation
         tempo_loss_total =[]
@@ -288,7 +306,7 @@ def train(args,
                 'best_valid_loss': best_trill_loss,
                 'optimizer': optimizer.state_dict(),
                 'training_step': NUM_UPDATED
-            }, is_best_trill, model_name='trill')
+            }, is_best_trill, model_name='trill', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
         else:
             utils.save_checkpoint({
                 'epoch': epoch + 1,
@@ -296,8 +314,7 @@ def train(args,
                 'best_valid_loss': best_prime_loss,
                 'optimizer': optimizer.state_dict(),
                 'training_step': NUM_UPDATED
-            }, is_best, model_name='prime')
-
+            }, is_best, model_name='prime', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
 
     #end of epoch
 
