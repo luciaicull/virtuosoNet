@@ -10,7 +10,9 @@ from .parser import get_parser, get_name
 from . import model as modelzoo
 from . import model_parameters as param
 from . import train
+from . import test
 from . import utils
+from .dataset import PerformDataset
 
 
 def main():
@@ -72,15 +74,19 @@ def main():
         model_config = param.initialize_model_parameters_by_code(args)
         model_config.training_args = args
         param.save_parameters(model_config, args.modelCode + '_param')
-    elif args.resumeTraining:
+    elif args.resumeTraining: # default = False
         model_config = param.load_parameters(args.modelCode + '_param')
-    else:
-        model_config = param.load_parameters(args.modelCode + '_param')
-        TrillNET_Param = param.load_parameters(args.trillCode + '_param')
+    else: 
+        model_config = param.load_parameters(
+            args.modelCode + '_param')  # default = han_ar
+        TrillNET_Param = param.load_parameters(
+            args.trillCode + '_param')  # default = trill_default
+        '''
         # if not hasattr(NET_PARAM, 'num_edge_types')
         #     NET_PARAM.num_edge_types = 10
         # if not hasattr(TrillNET_Param, 'num_edge_types'):
         #     TrillNET_Param.num_edge_types = 10
+        '''
         TRILL_MODEL = modelzoo.TrillRNN(TrillNET_Param, device).to(device)
 
     if 'isgn' in args.modelCode:
@@ -95,16 +101,18 @@ def main():
         MODEL = modelzoo.TrillRNN(model_config, device).to(device)
     else:
         print('Error: Unclassified model code')
+        '''
         # Model = modelzoo.HAN_VAE(NET_PARAM, device, False).to(device)
-
+        '''
     optimizer = th.optim.Adam(
         MODEL.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     
+    '''
     # checkpoint = args.checkpoints / f"{name}.th"
     # checkpoint_tmp = args.checkpoints / f"{name}.th.tmp"
     # if args.restart and checkpoint.exists():
     #     checkpoint.unlink()
-
+    '''
     # TODO: to single function
     # load dataset
 
@@ -153,14 +161,21 @@ def main():
     '''
     criterion = utils.criterion
 
-    train.train(args,
-                MODEL,
-                train_data,
-                valid_data,
-                device,
-                optimizer, 
-                None,  # TODO: bins: what should be?
-                criterion)
+    if args.sessMode == 'train' and not args.resumeTraining:
+        train.train(args,
+                    MODEL,
+                    train_data,
+                    valid_data,
+                    device,
+                    optimizer, 
+                    None,  # TODO: bins: what should be?
+                    criterion)
+
+    if args.sessMode == 'test' :
+        test.test(args,
+                  MODEL,
+                  TRILL_MODEL,
+                  MEAN,)
 
 
 if __name__ == "__main__":
