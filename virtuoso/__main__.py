@@ -116,7 +116,7 @@ def main():
     # TODO: to single function
     # load dataset
 
-    data_path = '/home/yoojin/data/20200330/test_xml_midi_95/save/'
+    data_path = '/home/yoojin/data/20200404/save/'
     train_data = PerformDataset(data_path, split='train')    
     valid_data = PerformDataset(data_path, split='valid')
     test_data = PerformDataset(data_path, split='test')
@@ -172,10 +172,15 @@ def main():
                     criterion)
 
     if args.sessMode == 'test' :
+        with open(data_path+'stat.dat', 'rb') as f:
+            u = cPickle.Unpickler(f)
+            feature_stats = u.load()
         test.test(args,
+                  test_data,
                   MODEL,
                   TRILL_MODEL,
-                  MEAN,)
+                  device,
+                  feature_stats)
 
 
 if __name__ == "__main__":
