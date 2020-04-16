@@ -17,6 +17,7 @@ from . import model_constants as const
 from . import model
 # from . import dataset
 from . import inference
+from torch.utils.tensorboard import SummaryWriter
 
 def sigmoid(x, gain=1):
   # why not np.sigmoid or something?
@@ -35,6 +36,15 @@ def train(args,
           optimizer, 
           bins,
           criterion):
+    logdir = Path(args.logs)
+    train_logdir = logdir.joinpath('train')
+    train_logdir.mkdir(exist_ok=True)
+    writer = SummaryWriter(train_logdir)
+    valid_logdir = logdir.joinpath('valid')
+    valid_logdir.mkdir(exist_ok=True)
+    valid_writer = SummaryWriter(valid_logdir)
+
+
     # isn't this redundant?
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
@@ -150,35 +160,42 @@ def train(args,
                 key_lists.append(key)
 
             for i in range(args.num_key_augmentation+1):
-                try:
-                    key = key_lists[i]
-                    temp_train_x = dp.key_augmentation(train_x, key)
-                    kld_weight = sigmoid((NUM_UPDATED - args.kld_sig) / (args.kld_sig/10)) * args.kld_max
+                #try:
+                key = key_lists[i]
+                temp_train_x = dp.key_augmentation(train_x, key)
+                kld_weight = sigmoid((NUM_UPDATED - args.kld_sig) / (args.kld_sig/10)) * args.kld_max
 
-                    training_data = {'x': temp_train_x, 'y': train_y, 'graphs': graphs,
-                                    'note_locations': note_locations,
-                                    'align_matched': align_matched, 'pedal_status': pedal_status,
-                                    'slice_idx': slice_idx, 'kld_weight': kld_weight}
+                training_data = {'x': temp_train_x, 'y': train_y, 'graphs': graphs,
+                                'note_locations': note_locations,
+                                'align_matched': align_matched, 'pedal_status': pedal_status,
+                                'slice_idx': slice_idx, 'kld_weight': kld_weight}
 
-                    tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
-                        utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
-                    tempo_loss_total.append(tempo_loss.item())
-                    vel_loss_total.append(vel_loss.item())
-                    dev_loss_total.append(dev_loss.item())
-                    articul_loss_total.append(articul_loss.item())
-                    pedal_loss_total.append(pedal_loss.item())
-                    trill_loss_total.append(trill_loss.item())
-                    kld_total.append(kld.item())
-                    NUM_UPDATED += 1
+                tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
+                    utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
+                tempo_loss_total.append(tempo_loss.item())
+                vel_loss_total.append(vel_loss.item())
+                dev_loss_total.append(dev_loss.item())
+                articul_loss_total.append(articul_loss.item())
+                pedal_loss_total.append(pedal_loss.item())
+                trill_loss_total.append(trill_loss.item())
+                kld_total.append(kld.item())
+                NUM_UPDATED += 1
 
-                except:
-                    print(train_xy[selected_sample.index]['perform_path'])
+                #except:
+                #    print(train_xy[selected_sample.index]['perform_path'])
             del selected_sample.slice_indexes[selected_idx]
             if len(selected_sample.slice_indexes) == 0:
                 # print('every slice in the sample is trained')
                 del remaining_samples[new_index]
                 del_count += 1
-                
+            
+            writer.add_scalar('tempo_loss', np.mean(tempo_loss_total))
+            writer.add_scalar('vel_loss', np.mean(vel_loss_total))
+            writer.add_scalar('dev_loss', np.mean(dev_loss_total))
+            writer.add_scalar('articulation_loss', np.mean(articul_loss_total))
+            writer.add_scalar('pedal_loss', np.mean(pedal_loss_total))
+            writer.add_scalar('trill_loss', np.mean(trill_loss_total))
+            writer.add_scalar('kld', np.mean(kld_total))
             if del_count % 50 == 0:
                 print('sample [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
                       .format(del_count, len(train_xy), np.mean(tempo_loss_total), np.mean(vel_loss_total),
@@ -289,6 +306,13 @@ def train(args,
 
         mean_valid_loss = (mean_tempo_loss + mean_vel_loss + mean_deviation_loss + mean_articul_loss + mean_pedal_loss * 7 + mean_kld_loss * kld_weight) / (11 + kld_weight)
 
+        valid_writer.add_scalar('tempo_loss', mean_tempo_loss)
+        valid_writer.add_scalar('vel_loss', mean_vel_loss)
+        valid_writer.add_scalar('dev_loss', mean_deviation_loss)
+        valid_writer.add_scalar('articulation_loss', mean_articul_loss)
+        valid_writer.add_scalar('pedal_loss', mean_pedal_loss)
+        valid_writer.add_scalar('trill_loss', mean_trill_loss)
+        valid_writer.add_scalar('kld', mean_kld_loss)
         print("Valid Loss= {:.4f} , Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}"
               .format(mean_valid_loss, mean_tempo_loss , mean_vel_loss,
                       mean_deviation_loss, mean_articul_loss, mean_pedal_loss, mean_trill_loss))
@@ -306,7 +330,7 @@ def train(args,
                 'best_valid_loss': best_trill_loss,
                 'optimizer': optimizer.state_dict(),
                 'training_step': NUM_UPDATED
-            }, is_best_trill, model_name='trill', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
+            }, is_best_trill, model_name='han-m_note_ar', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
         else:
             utils.save_checkpoint({
                 'epoch': epoch + 1,
@@ -314,7 +338,7 @@ def train(args,
                 'best_valid_loss': best_prime_loss,
                 'optimizer': optimizer.state_dict(),
                 'training_step': NUM_UPDATED
-            }, is_best, model_name='prime', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
+            }, is_best, model_name='han-m_note_ar', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
 
     #end of epoch
 
