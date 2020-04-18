@@ -40,6 +40,9 @@ def train(args,
     train_logdir = logdir.joinpath('train')
     train_logdir.mkdir(exist_ok=True)
     writer = SummaryWriter(train_logdir)
+    train_epoch_logdir = logdir.joinpath('train_epoch')
+    train_epoch_logdir.mkdir(exist_ok=True)
+    train_epoch_writer = SummaryWriter(train_epoch_logdir)
     valid_logdir = logdir.joinpath('valid')
     valid_logdir.mkdir(exist_ok=True)
     valid_writer = SummaryWriter(valid_logdir)
@@ -97,7 +100,7 @@ def train(args,
     print('training sample example', train_xy[0]['input_data'][0])
 
     train_model = model
-
+    count = 0
     # total_step = len(train_loader)
     for epoch in range(start_epoch, args.num_epochs):
         print('current training step is ', NUM_UPDATED)
@@ -115,7 +118,7 @@ def train(args,
             temp_training_sample = TraningSample(i)
             measure_numbers = [x.measure for x in train_xy[i]['note_location']]
             data_size = len(train_xy[i]['input_data'])
-            if model.config.hierarchy_level == 'measure':
+            if model.config.hierarchy_level == 'measure' and not model.config.is_dependent:
                 temp_training_sample.slice_indexes = dp.make_slice_with_same_measure_number(data_size,
                                                                                        measure_numbers,
                                                                                        measure_steps=args.time_steps)
@@ -169,9 +172,13 @@ def train(args,
                                 'note_locations': note_locations,
                                 'align_matched': align_matched, 'pedal_status': pedal_status,
                                 'slice_idx': slice_idx, 'kld_weight': kld_weight}
-
-                tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
-                    utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
+                try:
+                    tempo_loss, vel_loss, dev_loss, articul_loss, pedal_loss, trill_loss, kld = \
+                        utils.batch_train_run(training_data, model=train_model, args=args, optimizer=optimizer)
+                except Exception as ex:
+                    pass
+                    #print(ex)
+                    #print(train_xy[selected_sample.index]['perform_path'])
                 tempo_loss_total.append(tempo_loss.item())
                 vel_loss_total.append(vel_loss.item())
                 dev_loss_total.append(dev_loss.item())
@@ -188,19 +195,27 @@ def train(args,
                 # print('every slice in the sample is trained')
                 del remaining_samples[new_index]
                 del_count += 1
-            
-            writer.add_scalar('tempo_loss', np.mean(tempo_loss_total))
-            writer.add_scalar('vel_loss', np.mean(vel_loss_total))
-            writer.add_scalar('dev_loss', np.mean(dev_loss_total))
-            writer.add_scalar('articulation_loss', np.mean(articul_loss_total))
-            writer.add_scalar('pedal_loss', np.mean(pedal_loss_total))
-            writer.add_scalar('trill_loss', np.mean(trill_loss_total))
-            writer.add_scalar('kld', np.mean(kld_total))
+            #print('sample [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
+            #      .format(del_count, len(train_xy), np.mean(tempo_loss_total), np.mean(vel_loss_total),
+            #              np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
             if del_count % 50 == 0:
-                print('sample [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
-                      .format(del_count, len(train_xy), np.mean(tempo_loss_total), np.mean(vel_loss_total),
-                              np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
-                
+                #print('sample [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
+                #      .format(del_count, len(train_xy), np.mean(tempo_loss_total), np.mean(vel_loss_total),
+                #              np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
+                writer.add_scalar('tempo_loss', np.mean(
+                    tempo_loss_total), global_step=count)
+                writer.add_scalar('vel_loss', np.mean(
+                    vel_loss_total), global_step=count)
+                writer.add_scalar('dev_loss', np.mean(
+                    dev_loss_total), global_step=count)
+                writer.add_scalar('articulation_loss', np.mean(
+                    articul_loss_total), global_step=count)
+                writer.add_scalar('pedal_loss', np.mean(
+                    pedal_loss_total), global_step=count)
+                writer.add_scalar('trill_loss', np.mean(
+                    trill_loss_total), global_step=count)
+                writer.add_scalar('kld', np.mean(kld_total), global_step=count)
+            count += 1    
             # print("Remaining samples: ", sum([len(x.slice_indexes) for x in remaining_samples if x.slice_indexes]))
         print('===========================================================================')
         print('Epoch [{}/{}], Loss - Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}, KLD: {:.4f}'
@@ -208,7 +223,20 @@ def train(args,
                       np.mean(dev_loss_total), np.mean(articul_loss_total), np.mean(pedal_loss_total), np.mean(trill_loss_total), np.mean(kld_total)))
         print(
             '===========================================================================')
-
+        train_epoch_writer.add_scalar('tempo_loss', np.mean(
+            tempo_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar('vel_loss', np.mean(
+            vel_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar('dev_loss', np.mean(
+            dev_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar('articulation_loss', np.mean(
+            articul_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar('pedal_loss', np.mean(
+            pedal_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar('trill_loss', np.mean(
+            trill_loss_total), global_step=epoch)
+        train_epoch_writer.add_scalar(
+            'kld', np.mean(kld_total), global_step=epoch)
         ## Validation
         tempo_loss_total =[]
         vel_loss_total =[]
@@ -306,13 +334,19 @@ def train(args,
 
         mean_valid_loss = (mean_tempo_loss + mean_vel_loss + mean_deviation_loss + mean_articul_loss + mean_pedal_loss * 7 + mean_kld_loss * kld_weight) / (11 + kld_weight)
 
-        valid_writer.add_scalar('tempo_loss', mean_tempo_loss)
-        valid_writer.add_scalar('vel_loss', mean_vel_loss)
-        valid_writer.add_scalar('dev_loss', mean_deviation_loss)
-        valid_writer.add_scalar('articulation_loss', mean_articul_loss)
-        valid_writer.add_scalar('pedal_loss', mean_pedal_loss)
-        valid_writer.add_scalar('trill_loss', mean_trill_loss)
-        valid_writer.add_scalar('kld', mean_kld_loss)
+        valid_writer.add_scalar(
+            'tempo_loss', mean_tempo_loss, global_step=epoch)
+        valid_writer.add_scalar(
+            'vel_loss', mean_vel_loss, global_step=epoch)
+        valid_writer.add_scalar(
+            'dev_loss', mean_deviation_loss, global_step=epoch)
+        valid_writer.add_scalar(
+            'articulation_loss', mean_articul_loss, global_step=epoch)
+        valid_writer.add_scalar(
+            'pedal_loss', mean_pedal_loss, global_step=epoch)
+        valid_writer.add_scalar(
+            'trill_loss', mean_trill_loss, global_step=epoch)
+        valid_writer.add_scalar('kld', mean_kld_loss, global_step=epoch)
         print("Valid Loss= {:.4f} , Tempo: {:.4f}, Vel: {:.4f}, Deviation: {:.4f}, Articulation: {:.4f}, Pedal: {:.4f}, Trill: {:.4f}"
               .format(mean_valid_loss, mean_tempo_loss , mean_vel_loss,
                       mean_deviation_loss, mean_articul_loss, mean_pedal_loss, mean_trill_loss))
@@ -339,7 +373,6 @@ def train(args,
                 'optimizer': optimizer.state_dict(),
                 'training_step': NUM_UPDATED
             }, is_best, model_name='han-m_note_ar', folder=str(args.checkpoints), epoch='{0:03d}'.format(epoch))
-
     #end of epoch
 
 
