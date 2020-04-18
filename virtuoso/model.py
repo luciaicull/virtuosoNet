@@ -587,10 +587,10 @@ class HAN_Integrated(nn.Module):
             self.perform_style_to_measure = nn.LSTM(self.config.measure.size * 2 + self.config.encoder.size,
                                                     self.config.encoder.size, num_layers=1, bidirectional=False)
 
-            if self.config.hierarchy_level == 'measure':
+            if self.config.hierarchy_level == 'measure' and not self.config.is_dependent:
                 self.output_lstm = nn.LSTM(self.config.measure.size * 2 + self.config.encoder.size + self.config.output_size,
                                            self.config.final.size, num_layers=self.config.final.layers, batch_first=True)
-            elif self.config.hierarchy_level == 'beat':
+            elif self.config.hierarchy_level == 'beat' and not self.config.is_dependent:
                 self.output_lstm = nn.LSTM((self.config.beat.size + self.config.measure.size) * 2 + self.config.encoder.size + self.config.output_size,
                                            self.config.final.size, num_layers=self.config.final.layers, batch_first=True)
             else:
@@ -624,7 +624,7 @@ class HAN_Integrated(nn.Module):
             nn.ReLU(),
         )
 
-        if self.config.hierarchy_level:
+        if self.config.hierarchy_level and not self.config.is_dependent:
             self.fc = nn.Linear(self.config.final.size, self.config.output_size)
         else:
             self.output_lstm = nn.LSTM(self.config.final.input, self.config.final.size, num_layers=self.config.final.layers,
