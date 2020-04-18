@@ -137,7 +137,7 @@ def batch_train_run(data, model, args, optimizer):
     th.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
     optimizer.step()
 
-    if model.config.hierarchy_level in ['measure', 'beat']:
+    if model.config.hierarchy_level in ['measure', 'beat'] and not model.config.is_dependent:
         return tempo_loss, vel_loss, th.zeros(1), th.zeros(1), th.zeros(1), th.zeros(1), perform_kld
     elif model.config.is_trill:
         return th.zeros(1), th.zeros(1), th.zeros(1), th.zeros(1), th.zeros(1), total_loss, th.zeros(1)
