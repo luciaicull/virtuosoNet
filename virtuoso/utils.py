@@ -84,9 +84,9 @@ def batch_train_run(data, model, args, optimizer):
         = model_train(batch_x, batch_y, edges, note_locations, batch_start)
 
     if model.config.hierarchy_level in ['measure', 'beat'] and not model.config.is_dependent:
-        if model.is_hierarchy == 'measure':
+        if model.config.hierarchy_level == 'measure':
             hierarchy_numbers = [x.measure for x in note_locations]
-        elif model.is_hierarchy == 'beat':
+        elif model.config.hierarchy_level == 'beat':
             hierarchy_numbers = [x.beat for x in note_locations]
         tempo_in_hierarchy = model.note_tempo_infos_to_beat(
             batch_y, hierarchy_numbers, batch_start, 0)
