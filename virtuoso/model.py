@@ -744,15 +744,15 @@ class HAN_Integrated(nn.Module):
                                                                        num_notes, start_index)
 
         if self.config.hierarchy_level and not self.config.is_dependent:
-            if self.hierarchy == 'measure':
+            if self.config.hierarchy_level == 'measure':
                 hierarchy_numbers = measure_numbers
                 hierarchy_nodes = measure_hidden_out
-            elif self.hierarchy == 'beat':
+            elif self.config.hierarchy_level == 'beat':
                 hierarchy_numbers = beat_numbers
                 beat_measure_concated = torch.cat((beat_out_spanned, measure_out_spanned),2)
                 hierarchy_nodes = self.note_tempo_infos_to_beat(beat_measure_concated, hierarchy_numbers, start_index)
             num_hierarchy_nodes = hierarchy_nodes.shape[1]
-            if self.test_version:
+            if self.config.is_test_version:
                 hierarchy_nodes_latent_combined = torch.cat((hierarchy_nodes, measure_perform_style), 2)
             else:
                 perform_z_batched = perform_z.repeat(num_hierarchy_nodes, 1).view(1, num_hierarchy_nodes, -1)
