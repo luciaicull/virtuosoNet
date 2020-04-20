@@ -275,16 +275,16 @@ def train(args,
                 tempo_y = model.note_tempo_infos_to_beat(batch_y, hierarchy_numbers, 0, 0)
                 vel_y = model.note_tempo_infos_to_beat(batch_y, hierarchy_numbers, 0, 1)
 
-                tempo_loss = criterion(outputs[:, :, 0:1], tempo_y)
-                vel_loss = criterion(outputs[:, :, 1:2], vel_y)
+                tempo_loss = criterion(outputs[:, :, 0:1], tempo_y, model.config)
+                vel_loss = criterion(outputs[:, :, 1:2], vel_y, model.config)
                 if args.deltaLoss:
                     tempo_out_delta = outputs[:, 1:, 0:1] - outputs[:, :-1, 0:1]
                     tempo_true_delta = tempo_y[:, 1:, :] - tempo_y[:, :-1, :]
                     vel_out_delta = outputs[:, 1:, 1:2] - outputs[:, :-1, 1:2]
                     vel_true_delta = vel_y[:, 1:, :] - vel_y[:, :-1, :]
 
-                    tempo_loss += criterion(tempo_out_delta, tempo_true_delta) * args.delta_weight
-                    vel_loss += criterion(vel_out_delta, vel_true_delta) * args.delta_weight
+                    tempo_loss += criterion(tempo_out_delta, tempo_true_delta, model.config) * args.delta_weight
+                    vel_loss += criterion(vel_out_delta, vel_true_delta, model.config) * args.delta_weight
 
                 dev_loss = th.zeros(1)
                 articul_loss = th.zeros(1)
@@ -298,7 +298,7 @@ def train(args,
             elif model.config.is_trill:
                 trill_bool = batch_x[:,:, const.is_trill_index_concated] == 1
                 trill_bool = trill_bool.float().view(1,-1,1).to(device)
-                trill_loss = criterion(outputs, batch_y, trill_bool)
+                trill_loss = criterion(outputs, batch_y, model.config, trill_bool)
 
                 tempo_loss = th.zeros(1)
                 vel_loss = th.zeros(1)
